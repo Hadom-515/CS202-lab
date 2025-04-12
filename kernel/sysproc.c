@@ -131,9 +131,10 @@ sys_procinfo(void)
 
   // fill the struct
   proc_info.ppid = p->parent->pid;
-  proc_info.syscall_count = p->syscall_count;
-  proc_info.page_usage = p->sz/PGSIZE;
-  
+  proc_info.syscall_count = p->syscall_count-1; // not including this syscall
+  int n = p->sz/PGSIZE; // if sz not divisible by PGSIZE we are partially using one more page
+  proc_info.page_usage = (p->sz%PGSIZE) ? n+1 : n;
+
   // copy the struct to user space address
   if(copyout(p->pagetable, addr, (char*)&proc_info, sizeof(proc_info)) < 0){
     return -1;
