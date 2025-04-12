@@ -105,5 +105,8 @@ uint64 sys_sysinfo(void)
   if(n==0){
     return procCount();
   }
+  if(n==1){
+    return total_syscall()-1;
+  }
   return 0;
 }

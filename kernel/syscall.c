@@ -6,7 +6,7 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
-
+int total_Sys_calls=0; //stores total number of system call by incrementing each time syscall() is called
 // Fetch the uint64 at addr from the current process.
 int
 fetchaddr(uint64 addr, uint64 *ip)
@@ -136,7 +136,7 @@ syscall(void)
 {
   int num;
   struct proc *p = myproc();
-
+  total_Sys_calls++;
   num = p->trapframe->a7;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
     // Use num to lookup the system call function for num, call it,
@@ -147,4 +147,7 @@ syscall(void)
             p->pid, p->name, num);
     p->trapframe->a0 = -1;
   }
+}
+int total_syscall(void){
+  return total_Sys_calls;
 }

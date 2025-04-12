@@ -140,6 +140,7 @@ void            argaddr(int, uint64 *);
 int             fetchstr(uint64, char*, int);
 int             fetchaddr(uint64, uint64*);
 void            syscall();
+int             total_syscall(); //returns total number of system calls
 
 // trap.c
 extern uint     ticks;
