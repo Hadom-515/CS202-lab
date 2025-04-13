@@ -8,6 +8,7 @@ int main(int argc, char *argv[]){
     printf("Say hello to kernel %d\n",n);
     printf("The number of process = %d\n", sysinfo(0));
     printf("The number of syscalls = %d\n", sysinfo(1));
+    printf("The number of free pages = %d\n", sysinfo(2));
     hello(n);
     exit(0);
 }

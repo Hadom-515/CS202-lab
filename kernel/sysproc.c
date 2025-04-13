@@ -108,5 +108,8 @@ uint64 sys_sysinfo(void)
   if(n==1){
     return total_syscall()-1;
   }
+  if(n==2){
+    return freePageCount();
+  }
   return 0;
 }
