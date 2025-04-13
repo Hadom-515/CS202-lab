@@ -98,7 +98,7 @@ uint64 sys_hello(void)
   return 0;
 }
 //CS202 - Lab1 total syscalls
-extern int num_of_syscalls;
+extern int total_Sys_calls;
 
 uint64 sys_sysinfo(void)
 {
@@ -110,7 +110,7 @@ uint64 sys_sysinfo(void)
   else if(n==1){
     //Ifthi
     //return total_syscall()-1;
-    return num_of_syscalls;
+    return total_Sys_calls;
   }
   else if(n==2){
     return freePageCount();
