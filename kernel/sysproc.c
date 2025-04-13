@@ -119,3 +119,37 @@ uint64 sys_sysinfo(void)
     return -1;
   return 0;
 }
+
+uint64 
+sys_procinfo(void)
+{
+  // get this process
+  struct proc* p = myproc();
+
+  // address of user space buffer
+  // to copy the process info into
+  uint64 addr;
+  argaddr(0,&addr);
+  if(addr == 0){
+    return -1;
+  }
+
+  // make similar pinfo struct in kernel space
+  struct {
+    int ppid;
+    int syscall_count;
+    int page_usage;
+  } proc_info;
+
+  // fill the struct
+  proc_info.ppid = p->parent->pid;
+  proc_info.syscall_count = p->syscall_count-1; // not including this syscall
+  int n = p->sz/PGSIZE; // if sz not divisible by PGSIZE we are partially using one more page
+  proc_info.page_usage = (p->sz%PGSIZE) ? n+1 : n;
+
+  // copy the struct to user space address
+  if(copyout(p->pagetable, addr, (char*)&proc_info, sizeof(proc_info)) < 0){
+    return -1;
+  }
+  return 0;
+}
