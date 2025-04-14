@@ -84,11 +84,11 @@ kalloc(void)
 int freePageCount(void){
   int c=0;
   struct run *r=kmem.freelist;
-  acquire(&kmem.lock); //Ifthi
+  acquire(&kmem.lock); 
   while(r){
     c++;
     r=r->next;
   }
-  release(&kmem.lock); //Ifthi
+  release(&kmem.lock); 
   return c;
 }
