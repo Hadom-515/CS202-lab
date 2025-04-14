@@ -691,9 +691,9 @@ int procCount(void){
   int count = 0;
   struct proc *p;
   for(p = proc; p < &proc[NPROC]; p++){
-    acquire(&p->lock); //Ifthi
+    acquire(&p->lock);
     //if(p->state != UNUSED || p->state != USED){
-    if(p->state != UNUSED && p->state != USED){ //Ifthi
+    if(p->state != UNUSED && p->state != USED){
       count++;
     }
     release(&p->lock);
