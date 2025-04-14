@@ -160,7 +160,4 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
-//Ifthi
-/*int total_syscall(void){
-  return total_Sys_calls;
-}*/
+
