@@ -6,8 +6,10 @@
 #include "proc.h"
 #include "syscall.h"
 #include "defs.h"
-//cs202 lab1 total_Sys_calls
-int total_Sys_calls=0; //stores total number of system call by incrementing each time syscall() is called
+
+//cs202 lab1 total_syscalls
+int total_syscalls=0; //stores total number of system call by incrementing each time syscall() is called
+
 // Fetch the uint64 at addr from the current process.
 int
 fetchaddr(uint64 addr, uint64 *ip)
@@ -143,14 +145,10 @@ syscall(void)
   // count the syscalls
   p->syscall_count++;
 
-  //total_Sys_calls++;
   num = p->trapframe->a7;
+  if(num != 2)
+    total_syscalls++;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
-    total_Sys_calls++;
-    if ((num == SYS_sysinfo) && (first_sysinfo_deducted == 0))
-         {total_Sys_calls = total_Sys_calls - 1;
-          first_sysinfo_deducted = 1;
-         }
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
     p->trapframe->a0 = syscalls[num]();
@@ -160,7 +158,3 @@ syscall(void)
     p->trapframe->a0 = -1;
   }
 }
-//Ifthi
-/*int total_syscall(void){
-  return total_Sys_calls;
-}*/
