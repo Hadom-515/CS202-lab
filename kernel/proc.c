@@ -445,6 +445,12 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
+  #if defined(LOTTERY)
+  // Lottery scheduler
+  #elif defined(STRIDE)
+  // Stride scheduler
+  #else
+  // Round-robin scheduler
   struct proc *p;
   struct cpu *c = mycpu();
   
@@ -470,6 +476,7 @@ scheduler(void)
       release(&p->lock);
     }
   }
+  #endif
 }
 
 // Switch to scheduler.  Must hold only p->lock
