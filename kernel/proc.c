@@ -125,6 +125,8 @@ found:
   p->pid = allocpid();
   p->state = USED;
   p->syscall_count = 0;
+  p->tickets=10000;
+  p->ticks=0;
 
   // Allocate a trapframe page.
   if((p->trapframe = (struct trapframe *)kalloc()) == 0){
@@ -461,6 +463,7 @@ scheduler(void)
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        p->ticks++;
         swtch(&c->context, &p->context);
 
         // Process is done running for now.
@@ -700,4 +703,8 @@ int procCount(void){
   }
   return count;
 
+}
+void  print_statistics(void){
+  struct proc *p = myproc();
+  printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
 }

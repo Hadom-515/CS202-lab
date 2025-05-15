@@ -151,3 +151,18 @@ sys_procinfo(void)
   }
   return 0;
 }
+uint64 sys_sched_statistics(void){
+  print_statistics();
+  return 0;
+}
+uint64 sys_sched_tickets(void){
+  int n;
+  argint(0,&n);
+  if(n<=10000){
+    myproc()->tickets=n;
+  }
+  else{
+    myproc()->tickets=10000;
+  }
+  return 0;
+}

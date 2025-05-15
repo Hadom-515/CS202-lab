@@ -42,3 +42,5 @@ void *memcpy(void *, const void *, uint);
 int hello(int);
 int sysinfo(int);
 int procinfo(void*);
+int sched_statistics(void);
+int sched_tickets(int);
