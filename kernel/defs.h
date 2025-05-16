@@ -109,6 +109,7 @@ int             either_copyin(void *dst, int user_src, uint64 src, uint64 len);
 void            procdump(void);
 void            print_hello(int);
 int             procCount(void); //CS202 Lab1 counts number of processes
+void            print_statistics(void);
 
 // swtch.S
 void            swtch(struct context*, struct context*);

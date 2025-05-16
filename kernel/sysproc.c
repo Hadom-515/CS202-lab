@@ -98,7 +98,7 @@ uint64 sys_hello(void)
   return 0;
 }
 //CS202 - Lab1 total syscalls
-extern int total_Sys_calls;
+extern int total_syscalls;
 
 uint64 sys_sysinfo(void)
 {
@@ -108,7 +108,7 @@ uint64 sys_sysinfo(void)
     return procCount();
   }
   else if(n==1){
-    return total_Sys_calls;
+    return total_syscalls;
   }
   else if(n==2){
     return freePageCount();
@@ -148,6 +148,21 @@ sys_procinfo(void)
   // copy the struct to user space address
   if(copyout(p->pagetable, addr, (char*)&proc_info, sizeof(proc_info)) < 0){
     return -1;
+  }
+  return 0;
+}
+uint64 sys_sched_statistics(void){
+  print_statistics();
+  return 0;
+}
+uint64 sys_sched_tickets(void){
+  int n;
+  argint(0,&n);
+  if(n<=10000){
+    myproc()->tickets=n;
+  }
+  else{
+    myproc()->tickets=10000;
   }
   return 0;
 }

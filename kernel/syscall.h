@@ -21,5 +21,7 @@
 #define SYS_mkdir  20
 #define SYS_close  21
 #define SYS_hello  22
-#define SYS_sysinfo   23 // lab1 sysinfo syscall
-#define SYS_procinfo  24 // lab1 procinfo syscall
+#define SYS_sysinfo   23
+#define SYS_procinfo  24
+#define SYS_sched_statistics 25
+#define SYS_sched_tickets 26
