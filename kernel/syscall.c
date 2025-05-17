@@ -149,10 +149,14 @@ syscall(void)
   // count the syscalls
   p->syscall_count++;
 
+  //total_Sys_calls++;
   num = p->trapframe->a7;
-  if(num != 2)
-    total_syscalls++;
   if(num > 0 && num < NELEM(syscalls) && syscalls[num]) {
+    total_Sys_calls++;
+    if ((num == SYS_sysinfo) && (first_sysinfo_deducted == 0))
+         {total_Sys_calls = total_Sys_calls - 1;
+          first_sysinfo_deducted = 1;
+         }
     // Use num to lookup the system call function for num, call it,
     // and store its return value in p->trapframe->a0
     p->trapframe->a0 = syscalls[num]();
