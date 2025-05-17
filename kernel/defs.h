@@ -110,6 +110,7 @@ void            procdump(void);
 void            print_hello(int);
 int             procCount(void); //CS202 Lab1 counts number of processes
 void            print_statistics(void);
+unsigned short  rand();//CS202 Lab2 
 
 // swtch.S
 void            swtch(struct context*, struct context*);
