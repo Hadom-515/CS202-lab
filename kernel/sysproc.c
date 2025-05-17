@@ -158,11 +158,17 @@ uint64 sys_sched_statistics(void){
 uint64 sys_sched_tickets(void){
   int n;
   argint(0,&n);
+  struct proc* p = myproc();
+  if(n<0){
+    return -1;
+  }
   if(n<=10000){
-    myproc()->tickets=n;
+    p->tickets=n;
   }
   else{
-    myproc()->tickets=10000;
+    p->tickets=10000;
   }
+  p->stride=10000/p->tickets;
+  p->pass=p->stride;
   return 0;
 }

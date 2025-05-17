@@ -455,6 +455,7 @@ scheduler(void)
   // Lottery scheduler
   #elif defined(STRIDE)
   // Stride scheduler
+  printf("Stride scheduler\n");
   struct proc *p;
   struct cpu *c = mycpu();
   c->proc = 0;
@@ -462,7 +463,7 @@ scheduler(void)
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
     // select the process with the lowest pass value
-    int min_pass = 2147483647;
+    int min_pass = 2147483646;
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->pass < min_pass) {
@@ -472,14 +473,17 @@ scheduler(void)
       }
       release(&p->lock);
     }
+    // printf("min_pass: %d\n", min_pass);
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->pass == min_pass) {
+        printf("Process %d with pass %d\n", p->pid, p->pass);
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
         p->state = RUNNING;
         c->proc = p;
+        p->pass += p->stride;
         p->ticks++;
         swtch(&c->context, &p->context);
 
@@ -492,6 +496,7 @@ scheduler(void)
   }
   #else
   // Round-robin scheduler
+  printf("Round-robin scheduler\n");
   struct proc *p;
   struct cpu *c = mycpu();
   
