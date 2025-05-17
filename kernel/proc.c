@@ -126,6 +126,10 @@ found:
   p->state = USED;
   p->syscall_count = 0;
   p->tickets=10000;
+  
+  p->stride=10000/p->tickets;
+  p->pass=p->stride;
+
   p->ticks=0;
 
   // Allocate a trapframe page.
@@ -451,6 +455,41 @@ scheduler(void)
   // Lottery scheduler
   #elif defined(STRIDE)
   // Stride scheduler
+  struct proc *p;
+  struct cpu *c = mycpu();
+  c->proc = 0;
+  for(;;){
+    // Avoid deadlock by ensuring that devices can interrupt.
+    intr_on();
+    // select the process with the lowest pass value
+    int min_pass = 2147483647;
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && p->pass < min_pass) {
+        if(p->pass < min_pass){
+          min_pass = p->pass;
+        }
+      }
+      release(&p->lock);
+    }
+    for(p = proc; p < &proc[NPROC]; p++) {
+      acquire(&p->lock);
+      if(p->state == RUNNABLE && p->pass == min_pass) {
+        // Switch to chosen process.  It is the process's job
+        // to release its lock and then reacquire it
+        // before jumping back to us.
+        p->state = RUNNING;
+        c->proc = p;
+        p->ticks++;
+        swtch(&c->context, &p->context);
+
+        // Process is done running for now.
+        // It should have changed its p->state before coming back.
+        c->proc = 0;
+      }
+      release(&p->lock);
+    }
+  }
   #else
   // Round-robin scheduler
   struct proc *p;
