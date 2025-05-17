@@ -451,18 +451,54 @@ wait(uint64 addr)
 void
 scheduler(void)
 {
-  #if defined(LOTTERY)
-  // Lottery scheduler
-  #elif defined(STRIDE)
-  // Stride scheduler
-  printf("Stride scheduler\n");
   struct proc *p;
   struct cpu *c = mycpu();
+  //int total_num_tickets;
+  //int total_ticket_count;
   c->proc = 0;
+  //int winner;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
-    // select the process with the lowest pass value
+
+    #if defined(LOTTERY)
+      int winner;
+      int total_num_tickets = 0;
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE) {
+          total_num_tickets += p->tickets;
+        }
+        release(&p->lock);
+      }
+
+      if (total_num_tickets != 0) {
+          winner = rand() % total_num_tickets;
+          int total_ticket_count = 0;
+          for(p = proc; p < &proc[NPROC]; p++) {
+            acquire(&p->lock);
+            if(p->state == RUNNABLE) {
+              total_ticket_count += p->tickets;
+              if (total_ticket_count > winner) {
+                p->state = RUNNING;
+                c->proc = p;
+                p->ticks++;
+                swtch(&c->context, &p->context);
+
+                // Process is done running for now.
+                // It should have changed its p->state before coming back.
+                c->proc = 0;
+                release(&p->lock);
+                break;
+              }
+            }
+            release(&p->lock);
+          }
+      }
+
+    #elif defined(STRIDE)
+      // Stride scheduling
+      // select the process with the lowest pass value
     int min_pass = 2147483646;
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
@@ -477,6 +513,7 @@ scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->pass == min_pass) {
+        printf("Process %d with pass %d\n", p->pid, p->pass);
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -492,37 +529,27 @@ scheduler(void)
       }
       release(&p->lock);
     }
-  }
-  #else
-  // Round-robin scheduler
-  printf("Round-robin scheduler\n");
-  struct proc *p;
-  struct cpu *c = mycpu();
-  
-  c->proc = 0;
-  for(;;){
-    // Avoid deadlock by ensuring that devices can interrupt.
-    intr_on();
+    #else
 
-    for(p = proc; p < &proc[NPROC]; p++) {
-      acquire(&p->lock);
-      if(p->state == RUNNABLE) {
-        // Switch to chosen process.  It is the process's job
-        // to release its lock and then reacquire it
-        // before jumping back to us.
-        p->state = RUNNING;
-        c->proc = p;
-        p->ticks++;
-        swtch(&c->context, &p->context);
+      for(p = proc; p < &proc[NPROC]; p++) {
+        acquire(&p->lock);
+        if(p->state == RUNNABLE) {
+          // Switch to chosen process.  It is the process's job
+          // to release its lock and then reacquire it
+          // before jumping back to us.
+          p->state = RUNNING;
+          p->ticks++;
+          c->proc = p;
+          swtch(&c->context, &p->context);
 
-        // Process is done running for now.
-        // It should have changed its p->state before coming back.
-        c->proc = 0;
+          // Process is done running for now.
+          // It should have changed its p->state before coming back.
+          c->proc = 0;
+        }
+        release(&p->lock);
       }
-      release(&p->lock);
-    }
+    #endif
   }
-  #endif
 }
 
 // Switch to scheduler.  Must hold only p->lock
@@ -756,6 +783,13 @@ int procCount(void){
 }
 void  print_statistics(void){
   struct proc *p;
+  #if defined(LOTTERY)
+    printf("Lottery Scheduling \n");
+  #elif defined(STRIDE)
+    printf("Stride Scheduling \n");
+  #else
+    print("Default: Round Robin \n");
+  #endif
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
     //if(p->state != UNUSED || p->state != USED){
@@ -765,3 +799,13 @@ void  print_statistics(void){
     release(&p->lock);
   }
 }
+
+// Lab2 pseudo random generator (https://stackoverflow.com/a/7603688)
+unsigned short lfsr = 0xACE1u;
+unsigned short bit;
+
+unsigned short rand()
+  {
+    bit  = ((lfsr >> 0) ^ (lfsr >> 2) ^ (lfsr >> 3) ^ (lfsr >> 5) ) & 1;
+    return lfsr =  (lfsr >> 1) | (bit << 15);
+  }
