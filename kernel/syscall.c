@@ -8,8 +8,8 @@
 #include "defs.h"
 
 //cs202 lab1 total_syscalls
-int total_syscalls=0; //stores total number of system call by incrementing each time syscall() is called
-
+//int total_syscalls=0; //stores total number of system call by incrementing each time syscall() is called
+// int total_Sys_calls = 0;
 // Fetch the uint64 at addr from the current process.
 int
 fetchaddr(uint64 addr, uint64 *ip)
