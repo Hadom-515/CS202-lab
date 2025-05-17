@@ -756,6 +756,13 @@ int procCount(void){
 
 }
 void  print_statistics(void){
-  struct proc *p = myproc();
-  printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
+  struct proc *p;
+  for(p = proc; p < &proc[NPROC]; p++){
+    acquire(&p->lock);
+    //if(p->state != UNUSED || p->state != USED){
+    if(p->state != UNUSED && p->state != USED){
+      printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
+    }
+    release(&p->lock);
+  }
 }
