@@ -453,17 +453,15 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  //int total_num_tickets;
-  //int total_ticket_count;
   c->proc = 0;
-  //int winner;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
     #if defined(LOTTERY)
-      int winner;
+      int win_num;
       int total_num_tickets = 0;
+      // Get the total number of tickets by adding tickets from each process
       for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if(p->state == RUNNABLE) {
@@ -471,20 +469,22 @@ scheduler(void)
         }
         release(&p->lock);
       }
-
+      // Ensure that total_num_tickets not equal to zero as we are dividing by it to get the reminder
       if (total_num_tickets != 0) {
-          winner = rand() % total_num_tickets;
-          int total_ticket_count = 0;
+          //select the winner by calling rand() function. Reminder (mod) is the winning number.
+          win_num = rand() % total_num_tickets;
+          //navigate the processes by counting the tickets until a process holding the ticket greater than winning number 
+          int running_total = 0;
           for(p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if(p->state == RUNNABLE) {
-              total_ticket_count += p->tickets;
-              if (total_ticket_count > winner) {
+              running_total += p->tickets;
+              //if sum of tickets (running total) is > than winning number, winner is found.
+              if (running_total > win_num) {
                 p->state = RUNNING;
                 c->proc = p;
                 p->ticks++;
                 swtch(&c->context, &p->context);
-
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 c->proc = 0;
