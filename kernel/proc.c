@@ -126,6 +126,56 @@ found:
   p->state = USED;
   p->syscall_count = 0;
   p->tickets=10000;
+  p->threadid=0;
+  
+  p->stride=10000/p->tickets;
+  p->pass=p->stride;
+
+  p->ticks=0;
+
+  // Allocate a trapframe page.
+  if((p->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // An empty user page table.
+  p->pagetable = proc_pagetable(p);
+  if(p->pagetable == 0){
+    freeproc(p);
+    release(&p->lock);
+    return 0;
+  }
+
+  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  memset(&p->context, 0, sizeof(p->context));
+  p->context.ra = (uint64)forkret;
+  p->context.sp = p->kstack + PGSIZE;
+
+  return p;
+}
+static struct proc* allocproc_thread(void)
+{
+  struct proc *p;
+
+  for(p = proc; p < &proc[NPROC]; p++) {
+    acquire(&p->lock);
+    if(p->state == UNUSED) {
+      goto found;
+    } else {
+      release(&p->lock);
+    }
+  }
+  return 0;
+
+found:
+  p->pid = allocpid();
+  p->state = USED;
+  p->syscall_count = 0;
+  p->tickets=10000;
+  p->threadid=0;
   
   p->stride=10000/p->tickets;
   p->pass=p->stride;
@@ -242,6 +292,7 @@ userinit(void)
   struct proc *p;
 
   p = allocproc();
+
   initproc = p;
   
   // allocate one user page and copy initcode's instructions
@@ -453,15 +504,17 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
+  //int total_num_tickets;
+  //int total_ticket_count;
   c->proc = 0;
+  //int winner;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
     #if defined(LOTTERY)
-      int win_num;
+      int winner;
       int total_num_tickets = 0;
-      // Get the total number of tickets by adding tickets from each process
       for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if(p->state == RUNNABLE) {
@@ -469,22 +522,20 @@ scheduler(void)
         }
         release(&p->lock);
       }
-      // Ensure that total_num_tickets not equal to zero as we are dividing by it to get the reminder
+
       if (total_num_tickets != 0) {
-          //select the winner by calling rand() function. Reminder (mod) is the winning number.
-          win_num = rand() % total_num_tickets;
-          //navigate the processes by counting the tickets until a process holding the ticket greater than winning number 
-          int running_total = 0;
+          winner = rand() % total_num_tickets;
+          int total_ticket_count = 0;
           for(p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if(p->state == RUNNABLE) {
-              running_total += p->tickets;
-              //if sum of tickets (running total) is > than winning number, winner is found.
-              if (running_total > win_num) {
+              total_ticket_count += p->tickets;
+              if (total_ticket_count > winner) {
                 p->state = RUNNING;
                 c->proc = p;
                 p->ticks++;
                 swtch(&c->context, &p->context);
+
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 c->proc = 0;
@@ -513,6 +564,7 @@ scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->pass == min_pass) {
+        printf("Process %d with pass %d\n", p->pid, p->pass);
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -787,7 +839,7 @@ void  print_statistics(void){
   #elif defined(STRIDE)
     printf("Stride Scheduling \n");
   #else
-    print("Default: Round Robin \n");
+    printf("Default: Round Robin \n");
   #endif
   for(p = proc; p < &proc[NPROC]; p++){
     acquire(&p->lock);
@@ -797,6 +849,52 @@ void  print_statistics(void){
     }
     release(&p->lock);
   }
+}
+int clone(void*){
+  int i, pid;
+  struct proc *np;
+  struct proc *p = myproc();
+
+  // Allocate process.
+  if((np = allocproc()) == 0){
+    return -1;
+  }
+
+  // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
+  np->sz = p->sz;
+
+  // copy saved user registers.
+  *(np->trapframe) = *(p->trapframe);
+
+  // Cause fork to return 0 in the child.
+  np->trapframe->a0 = 0;
+
+  // increment reference counts on open file descriptors.
+  for(i = 0; i < NOFILE; i++)
+    if(p->ofile[i])
+      np->ofile[i] = filedup(p->ofile[i]);
+  np->cwd = idup(p->cwd);
+
+  safestrcpy(np->name, p->name, sizeof(p->name));
+
+  pid = np->pid;
+
+  release(&np->lock);
+
+  acquire(&wait_lock);
+  np->parent = p;
+  release(&wait_lock);
+
+  acquire(&np->lock);
+  np->state = RUNNABLE;
+  release(&np->lock);
+
+  return pid;
 }
 
 // Lab2 pseudo random generator (https://stackoverflow.com/a/7603688)
