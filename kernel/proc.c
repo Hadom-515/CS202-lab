@@ -157,7 +157,7 @@ found:
 
   return p;
 }
-static struct proc* allocproc_thread(struct proc* p)
+static struct proc* allocproc_thread(struct proc* p,void* startAdress)
 {
   struct proc *t;
 
@@ -196,6 +196,7 @@ found:
     uvmfree(p->pagetable, 0);
     return 0;
   }
+  t->trapframe->sp=(uint64)startAdress;
 
   // An empty user tage table.
   t->pagetable = p->pagetable;
@@ -204,8 +205,7 @@ found:
   // which returns to user space.
   memset(&t->context, 0, sizeof(t->context));
   t->context.ra = (uint64)forkret;
-  t->context.sp = t->kstack + PGSIZE;
-
+  t->context.sp =(uint64)startAdress;
   return t;
 }
 
@@ -350,11 +350,6 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
-    freeproc(np);
-    release(&np->lock);
-    return -1;
-  }
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -853,7 +848,7 @@ void  print_statistics(void){
     release(&p->lock);
   }
 }
-int clone(void*){
+int clone(void* a){
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
@@ -861,7 +856,7 @@ int clone(void*){
 
 
   // Allocate process.
-  if((np = allocproc_thread(p)) == 0){
+  if((np = allocproc_thread(p,a)) == 0){
     return -1;
   }
 
