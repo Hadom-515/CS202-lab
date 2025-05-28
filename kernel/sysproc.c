@@ -172,3 +172,10 @@ uint64 sys_sched_tickets(void){
   p->pass=p->stride;
   return 0;
 }
+uint64 sys_clone(void)
+{
+  uint64 addr;
+  argaddr(0,&addr);
+  clone((void*)addr);
+  return 0;
+}

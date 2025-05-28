@@ -47,3 +47,4 @@ int sysinfo(int);
 int procinfo(void*);
 int sched_statistics(void);
 int sched_tickets(int);
+int clone(void*);

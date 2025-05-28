@@ -127,6 +127,7 @@ found:
   p->syscall_count = 0;
   p->tickets=10000;
   p->threadid=0;
+  p->numThreads=0;
   
   p->stride=10000/p->tickets;
   p->pass=p->stride;
@@ -156,54 +157,54 @@ found:
 
   return p;
 }
-static struct proc* allocproc_thread(void)
+static struct proc* allocproc_thread(struct proc* p)
 {
-  struct proc *p;
+  struct proc *t;
 
-  for(p = proc; p < &proc[NPROC]; p++) {
-    acquire(&p->lock);
-    if(p->state == UNUSED) {
+  for(t = proc; t < &proc[NPROC]; t++) {
+    acquire(&t->lock);
+    if(t->state == UNUSED) {
       goto found;
     } else {
-      release(&p->lock);
+      release(&t->lock);
     }
   }
   return 0;
 
 found:
-  p->pid = allocpid();
-  p->state = USED;
-  p->syscall_count = 0;
-  p->tickets=10000;
-  p->threadid=0;
+  t->pid = p->pid;
+  t->threadid=p->numThreads;
+  t->state = USED;
+  t->syscall_count = 0;
+  t->tickets=10000;
   
-  p->stride=10000/p->tickets;
-  p->pass=p->stride;
+  t->stride=10000/t->tickets;
+  t->pass=t->stride;
 
-  p->ticks=0;
+  t->ticks=0;
 
   // Allocate a trapframe page.
-  if((p->trapframe = (struct trapframe *)kalloc()) == 0){
-    freeproc(p);
-    release(&p->lock);
+  if((t->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(t);
+    release(&t->lock);
     return 0;
   }
 
-  // An empty user page table.
-  p->pagetable = proc_pagetable(p);
-  if(p->pagetable == 0){
-    freeproc(p);
-    release(&p->lock);
+  // An empty user tage table.
+  t->pagetable = proc_pagetable(p);
+  if(t->pagetable == 0){
+    freeproc(t);
+    release(&t->lock);
     return 0;
   }
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
-  memset(&p->context, 0, sizeof(p->context));
-  p->context.ra = (uint64)forkret;
-  p->context.sp = p->kstack + PGSIZE;
+  memset(&t->context, 0, sizeof(t->context));
+  t->context.ra = (uint64)forkret;
+  t->context.sp = t->kstack + PGSIZE;
 
-  return p;
+  return t;
 }
 
 // free a proc structure and the data hanging from it,
@@ -854,9 +855,11 @@ int clone(void*){
   int i, pid;
   struct proc *np;
   struct proc *p = myproc();
+  p->numThreads++;
+
 
   // Allocate process.
-  if((np = allocproc()) == 0){
+  if((np = allocproc_thread(p)) == 0){
     return -1;
   }
 
