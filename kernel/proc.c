@@ -189,14 +189,16 @@ found:
     release(&t->lock);
     return 0;
   }
-
-  // An empty user tage table.
-  t->pagetable = proc_pagetable(p);
-  if(t->pagetable == 0){
-    freeproc(t);
-    release(&t->lock);
+  // trampoline.S.
+  if(mappages(p->pagetable, TRAPFRAME - PGSIZE * t->threadid, PGSIZE,
+              (uint64)(t->trapframe), PTE_R | PTE_W) < 0){
+    uvmunmap(p->pagetable, TRAMPOLINE, 1, 0);
+    uvmfree(p->pagetable, 0);
     return 0;
   }
+
+  // An empty user tage table.
+  t->pagetable = p->pagetable;
 
   // Set up new context to start executing at forkret,
   // which returns to user space.
