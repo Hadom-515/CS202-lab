@@ -192,8 +192,7 @@ found:
   // trampoline.S.
   if(mappages(p->pagetable, TRAPFRAME - PGSIZE * t->threadid, PGSIZE,
               (uint64)(t->trapframe), PTE_R | PTE_W) < 0){
-    uvmunmap(p->pagetable, TRAMPOLINE, 1, 0);
-    uvmfree(p->pagetable, 0);
+    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (t->threadid-1), 1, 0);
     return 0;
   }
   t->trapframe->sp=(uint64)startAdress;
@@ -218,8 +217,10 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->pagetable)
-    proc_freepagetable(p->pagetable, p->sz);
+  if(p->threadid == 0){
+    if(p->pagetable)
+      proc_freepagetable(p->pagetable, p->sz);
+  }
   p->pagetable = 0;
   p->sz = 0;
   p->pid = 0;
@@ -843,13 +844,13 @@ void  print_statistics(void){
     acquire(&p->lock);
     //if(p->state != UNUSED || p->state != USED){
     if(p->state != UNUSED && p->state != USED){
-      printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
+      printf("%d(%d)(%s): tickets: %d, ticks: %d\n",p->pid,p->threadid,p->name,p->tickets,p->ticks);
     }
     release(&p->lock);
   }
 }
 int clone(void* a){
-  int i, pid;
+  int i, tid;
   struct proc *np;
   struct proc *p = myproc();
   p->numThreads++;
@@ -861,11 +862,6 @@ int clone(void* a){
   }
 
   // Copy user memory from parent to child.
-  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
-    freeproc(np);
-    release(&np->lock);
-    return -1;
-  }
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -882,7 +878,7 @@ int clone(void* a){
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
-  pid = np->pid;
+  tid = np->pid;
 
   release(&np->lock);
 
@@ -894,7 +890,7 @@ int clone(void* a){
   np->state = RUNNABLE;
   release(&np->lock);
 
-  return pid;
+  return tid;
 }
 
 // Lab2 pseudo random generator (https://stackoverflow.com/a/7603688)
