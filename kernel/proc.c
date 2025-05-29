@@ -1,3 +1,4 @@
+
 #include "types.h"
 #include "param.h"
 #include "memlayout.h"
@@ -126,8 +127,6 @@ found:
   p->state = USED;
   p->syscall_count = 0;
   p->tickets=10000;
-  p->threadid=0;
-  p->numThreads=0;
   
   p->stride=10000/p->tickets;
   p->pass=p->stride;
@@ -157,56 +156,6 @@ found:
 
   return p;
 }
-static struct proc* allocproc_thread(struct proc* p,void* startAdress)
-{
-  struct proc *t;
-
-  for(t = proc; t < &proc[NPROC]; t++) {
-    acquire(&t->lock);
-    if(t->state == UNUSED) {
-      goto found;
-    } else {
-      release(&t->lock);
-    }
-  }
-  return 0;
-
-found:
-  t->pid = p->pid;
-  t->threadid=p->numThreads;
-  t->state = USED;
-  t->syscall_count = 0;
-  t->tickets=10000;
-  
-  t->stride=10000/t->tickets;
-  t->pass=t->stride;
-
-  t->ticks=0;
-
-  // Allocate a trapframe page.
-  if((t->trapframe = (struct trapframe *)kalloc()) == 0){
-    freeproc(t);
-    release(&t->lock);
-    return 0;
-  }
-  // trampoline.S.
-  if(mappages(p->pagetable, TRAPFRAME - PGSIZE * t->threadid, PGSIZE,
-              (uint64)(t->trapframe), PTE_R | PTE_W) < 0){
-    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (t->threadid-1), 1, 0);
-    return 0;
-  }
-  t->trapframe->sp=(uint64)startAdress;
-
-  // An empty user tage table.
-  t->pagetable = p->pagetable;
-
-  // Set up new context to start executing at forkret,
-  // which returns to user space.
-  memset(&t->context, 0, sizeof(t->context));
-  t->context.ra = (uint64)forkret;
-  t->context.sp =(uint64)startAdress;
-  return t;
-}
 
 // free a proc structure and the data hanging from it,
 // including user pages.
@@ -217,9 +166,9 @@ freeproc(struct proc *p)
   if(p->trapframe)
     kfree((void*)p->trapframe);
   p->trapframe = 0;
-  if(p->threadid == 0){
-    if(p->pagetable)
-      proc_freepagetable(p->pagetable, p->sz);
+  if(p->threadid==0){
+  if(p->pagetable)
+    proc_freepagetable(p->pagetable, p->sz);
   }
   p->pagetable = 0;
   p->sz = 0;
@@ -296,7 +245,6 @@ userinit(void)
   struct proc *p;
 
   p = allocproc();
-
   initproc = p;
   
   // allocate one user page and copy initcode's instructions
@@ -351,6 +299,11 @@ fork(void)
   }
 
   // Copy user memory from parent to child.
+  if(uvmcopy(p->pagetable, np->pagetable, p->sz) < 0){
+    freeproc(np);
+    release(&np->lock);
+    return -1;
+  }
   np->sz = p->sz;
 
   // copy saved user registers.
@@ -503,17 +456,15 @@ scheduler(void)
 {
   struct proc *p;
   struct cpu *c = mycpu();
-  //int total_num_tickets;
-  //int total_ticket_count;
   c->proc = 0;
-  //int winner;
   for(;;){
     // Avoid deadlock by ensuring that devices can interrupt.
     intr_on();
 
     #if defined(LOTTERY)
-      int winner;
+      int win_num;
       int total_num_tickets = 0;
+      // Get the total number of tickets by adding tickets from each process
       for(p = proc; p < &proc[NPROC]; p++) {
         acquire(&p->lock);
         if(p->state == RUNNABLE) {
@@ -521,20 +472,22 @@ scheduler(void)
         }
         release(&p->lock);
       }
-
+      // Ensure that total_num_tickets not equal to zero as we are dividing by it to get the reminder
       if (total_num_tickets != 0) {
-          winner = rand() % total_num_tickets;
-          int total_ticket_count = 0;
+          //select the winner by calling rand() function. Reminder (mod) is the winning number.
+          win_num = rand() % total_num_tickets;
+          //navigate the processes by counting the tickets until a process holding the ticket greater than winning number 
+          int running_total = 0;
           for(p = proc; p < &proc[NPROC]; p++) {
             acquire(&p->lock);
             if(p->state == RUNNABLE) {
-              total_ticket_count += p->tickets;
-              if (total_ticket_count > winner) {
+              running_total += p->tickets;
+              //if sum of tickets (running total) is > than winning number, winner is found.
+              if (running_total > win_num) {
                 p->state = RUNNING;
                 c->proc = p;
                 p->ticks++;
                 swtch(&c->context, &p->context);
-
                 // Process is done running for now.
                 // It should have changed its p->state before coming back.
                 c->proc = 0;
@@ -563,7 +516,6 @@ scheduler(void)
     for(p = proc; p < &proc[NPROC]; p++) {
       acquire(&p->lock);
       if(p->state == RUNNABLE && p->pass == min_pass) {
-        printf("Process %d with pass %d\n", p->pid, p->pass);
         // Switch to chosen process.  It is the process's job
         // to release its lock and then reacquire it
         // before jumping back to us.
@@ -844,17 +796,64 @@ void  print_statistics(void){
     acquire(&p->lock);
     //if(p->state != UNUSED || p->state != USED){
     if(p->state != UNUSED && p->state != USED){
-      printf("%d(%d)(%s): tickets: %d, ticks: %d\n",p->pid,p->threadid,p->name,p->tickets,p->ticks);
+      printf("%d(%s): tickets: %d, ticks: %d\n",p->pid,p->name,p->tickets,p->ticks);
     }
     release(&p->lock);
   }
 }
-int clone(void* a){
+static struct proc*
+allocproc_thread(struct proc* p,void* a)
+{
+  struct proc *t;
+
+  for(t = proc; t < &proc[NPROC]; t++) {
+    acquire(&t->lock);
+    if(t->state == UNUSED) {
+      goto found;
+    } else {
+      release(&t->lock);
+    }
+  }
+  return 0;
+
+found:
+  t->threadid = p->numThreads;
+  t->state = USED;
+  t->syscall_count = 0;
+  t->tickets=10000;
+  
+  t->stride=10000/p->tickets;
+  t->pass=p->stride;
+
+  t->ticks=0;
+
+  // Allocate a trapframe page.
+  if((t->trapframe = (struct trapframe *)kalloc()) == 0){
+    freeproc(t);
+    release(&t->lock);
+    return 0;
+  }
+
+  // An empty user page table.
+  if(mappages(p->pagetable, TRAPFRAME - PGSIZE * t->threadid, PGSIZE,
+              (uint64)(t->trapframe), PTE_R | PTE_W) < 0){
+    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (t->threadid-1), 1, 0);
+    return 0;
+  }
+
+  // Set up new context to start executing at forkret,
+  // which returns to user space.
+  memset(&t->context, 0, sizeof(t->context));
+  t->context.ra = (uint64)forkret;
+  t->context.sp = (uint64)a;
+
+  return t;
+}
+int clone(void * a){
   int i, tid;
   struct proc *np;
   struct proc *p = myproc();
   p->numThreads++;
-
 
   // Allocate process.
   if((np = allocproc_thread(p,a)) == 0){
@@ -866,6 +865,8 @@ int clone(void* a){
 
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
+  np->pagetable=p->pagetable;
+  np->trapframe->sp=(uint64)a;
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
@@ -878,7 +879,7 @@ int clone(void* a){
 
   safestrcpy(np->name, p->name, sizeof(p->name));
 
-  tid = np->pid;
+  tid = p->numThreads;
 
   release(&np->lock);
 
