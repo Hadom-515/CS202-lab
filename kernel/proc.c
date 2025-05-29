@@ -127,6 +127,7 @@ found:
   p->state = USED;
   p->syscall_count = 0;
   p->tickets=10000;
+  p->threadid=0;
   
   p->stride=10000/p->tickets;
   p->pass=p->stride;
@@ -169,6 +170,9 @@ freeproc(struct proc *p)
   if(p->threadid==0){
   if(p->pagetable)
     proc_freepagetable(p->pagetable, p->sz);
+  }
+  else{
+    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (p->threadid), 1, 0);
   }
   p->pagetable = 0;
   p->sz = 0;
@@ -360,13 +364,14 @@ exit(int status)
 
   if(p == initproc)
     panic("init exiting");
-
+  if(p->threadid == 0){
   // Close all open files.
   for(int fd = 0; fd < NOFILE; fd++){
-    if(p->ofile[fd]){
-      struct file *f = p->ofile[fd];
-      fileclose(f);
-      p->ofile[fd] = 0;
+      if(p->ofile[fd]){
+        struct file *f = p->ofile[fd];
+        fileclose(f);
+        p->ofile[fd] = 0;
+      }
     }
   }
 
@@ -802,9 +807,15 @@ void  print_statistics(void){
   }
 }
 static struct proc*
-allocproc_thread(struct proc* p,void* a)
+allocproc_thread()
 {
   struct proc *t;
+  int threadn;
+  struct proc* p = myproc();
+  acquire(&p->lock);
+  p->numThreads++;
+  threadn=p->numThreads;
+  release(&p->lock);
 
   for(t = proc; t < &proc[NPROC]; t++) {
     acquire(&t->lock);
@@ -817,7 +828,8 @@ allocproc_thread(struct proc* p,void* a)
   return 0;
 
 found:
-  t->threadid = p->numThreads;
+  t->pid = allocpid();
+  t->threadid = threadn;
   t->state = USED;
   t->syscall_count = 0;
   t->tickets=10000;
@@ -837,7 +849,7 @@ found:
   // An empty user page table.
   if(mappages(p->pagetable, TRAPFRAME - PGSIZE * t->threadid, PGSIZE,
               (uint64)(t->trapframe), PTE_R | PTE_W) < 0){
-    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (t->threadid-1), 1, 0);
+    uvmunmap(p->pagetable, TRAPFRAME - PGSIZE * (t->threadid), 1, 0);
     return 0;
   }
 
@@ -845,7 +857,7 @@ found:
   // which returns to user space.
   memset(&t->context, 0, sizeof(t->context));
   t->context.ra = (uint64)forkret;
-  t->context.sp = (uint64)a;
+  t->context.sp = t->kstack + PGSIZE;
 
   return t;
 }
@@ -853,12 +865,12 @@ int clone(void * a){
   int i, tid;
   struct proc *np;
   struct proc *p = myproc();
-  p->numThreads++;
 
   // Allocate process.
-  if((np = allocproc_thread(p,a)) == 0){
+  if((np = allocproc_thread()) == 0){
     return -1;
   }
+ 
 
   // Copy user memory from parent to child.
   np->sz = p->sz;
@@ -866,7 +878,7 @@ int clone(void * a){
   // copy saved user registers.
   *(np->trapframe) = *(p->trapframe);
   np->pagetable=p->pagetable;
-  np->trapframe->sp=(uint64)a;
+  np->trapframe->sp=(uint64)a+PGSIZE;
 
   // Cause fork to return 0 in the child.
   np->trapframe->a0 = 0;
@@ -890,7 +902,6 @@ int clone(void * a){
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
-
   return tid;
 }
 
