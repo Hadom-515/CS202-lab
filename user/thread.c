@@ -10,7 +10,7 @@ int thread_create(void (*start_routine)(void *), void *arg) {
   }
 
   // Call clone with the allocated stack
-  int tid = clone(stack);
+  int tid = clone(stack+PGSIZE);
   if (tid < 0) {
     free(stack);
     return -1;
