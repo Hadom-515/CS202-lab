@@ -880,7 +880,7 @@ int clone(void * a){
   np->pagetable=p->pagetable;
   np->trapframe->sp=(uint64)a+PGSIZE;
 
-  // Cause fork to return 0 in the child.
+  // Cause clone to return 0 in the child.
   np->trapframe->a0 = 0;
 
   // increment reference counts on open file descriptors.
@@ -902,6 +902,7 @@ int clone(void * a){
   acquire(&np->lock);
   np->state = RUNNABLE;
   release(&np->lock);
+
   return tid;
 }
 

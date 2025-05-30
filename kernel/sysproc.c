@@ -176,6 +176,5 @@ uint64 sys_clone(void)
 {
   uint64 addr;
   argaddr(0,&addr);
-  clone((void*)addr);
-  return 0;
+  return clone((void*)addr);
 }

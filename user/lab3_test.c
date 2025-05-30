@@ -5,6 +5,7 @@ int main(int argc, char *argv[]){
     void *stack = malloc(4096);
 
     int pid = clone(stack);
+    printf("pid: %d\n", pid);
     if(pid == 0)
     {
         printf("Child thread!\n");
@@ -12,8 +13,8 @@ int main(int argc, char *argv[]){
     }
     else
     {
-        printf("Parent process!\n");
         wait(0);
+        printf("Parent process!\n");
     }
     
 

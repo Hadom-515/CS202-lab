@@ -1,8 +1,10 @@
 #include "kernel/types.h"
+#include "kernel/stat.h"
 #include "user/user.h"
 #include "kernel/riscv.h"
+#include "user/thread.h"
 
-int thread_create(void (*start_routine)(void *), void *arg) {
+int thread_create(void *(start_routine)(void *), void *arg) {
   // Allocate a stack of PGSIZE bytes for the thread
   void *stack = malloc(PGSIZE);
   if (stack == 0) {
@@ -10,7 +12,7 @@ int thread_create(void (*start_routine)(void *), void *arg) {
   }
 
   // Call clone with the allocated stack
-  int tid = clone(stack+PGSIZE);
+  int tid = clone(stack + PGSIZE);
   if (tid < 0) {
     free(stack);
     return -1;
@@ -26,15 +28,11 @@ int thread_create(void (*start_routine)(void *), void *arg) {
   return 0;
 }
 
-struct lock_t {
-  uint locked;  // 1 if the lock is held, 0 otherwise
-};
-
-void lock_init(struct lock_t* lock) {
-  lock->locked = 0;  // Unlocked
+void lock_init(struct lock_t *lock) {
+  lock->locked = 0; // Unlocked
 }
 
-void lock_acquire(struct lock_t* lock) {
+void lock_acquire(struct lock_t *lock) {
   // __sync_lock_test_and_set assigns &lock->locked to 1
   // and returns the previous value. If the previous value was 1,
   // the lock is already held, so we spin until it becomes 0.
@@ -43,7 +41,7 @@ void lock_acquire(struct lock_t* lock) {
   }
 }
 
-void lock_release(struct lock_t* lock) {
+void lock_release(struct lock_t *lock) {
   // set lock->locked to 0 atomically
   __sync_lock_release(&lock->locked);
 }
